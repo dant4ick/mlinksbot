@@ -1,0 +1,11 @@
+.venv/
+.vscode/
+.idea/
+
+__pycache__/
+cache/
+
+*.sh
+*.db
+
+youtube_cookies.txt
