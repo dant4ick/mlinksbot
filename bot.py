@@ -53,7 +53,7 @@ def init_bot():
         results = []
         for song in search_results:
             song_info = await fetch_song_info(song['url'])
-            result = await generate_inline_query_results(song_info, preview=True)
+            result = await generate_inline_query_results(song_info, preview=False)
             results.extend(result)
 
         await inline_query.answer(results, cache_time=1)
@@ -72,7 +72,6 @@ def init_bot():
 
     @dp.callback_query(F.data == "download_error")
     async def handle_download_error(call: types.CallbackQuery):
-        await bot.edit_message_reply_markup(inline_message_id=call.inline_message_id, reply_markup=None)
         await call.answer("There was an error downloading the track. It might be too long or unavailable.", show_alert=True)
 
     @dp.callback_query()

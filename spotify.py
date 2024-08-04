@@ -82,23 +82,26 @@ async def fetch_song_info(url: str):
 def process_song_info(data: dict):
     song_data = data.get('entitiesByUniqueId', {})
     result = {}
-
+    
     for key, value in song_data.items():
-        if 'thumbnailUrl' in value and "ANGHAMI_SONG" not in key and "BOOMPLAY_SONG" not in key and "YOUTUBE" not in key and "SOUNDCLOUD" not in key:
+        if 'thumbnailUrl' in value and "ANGHAMI_SONG" not in key and "BOOMPLAY_SONG" not in key and "SOUNDCLOUD" not in key:
             result = {
                 'platform_urls': {'All': data.get('pageUrl')},
                 'title': value.get('title'),
                 'artistName': value.get('artistName'),
                 'thumbnailUrl': value.get('thumbnailUrl')
             }
+            
+            if "YOUTUBE" in key:
+                # Trying to avoid using YouTube song's info
+                continue
             break
 
     if result and 'linksByPlatform' in data:
-        platforms = {'spotify': 'Spotify', 'yandex': 'Yandex', 'soundcloud':'SoundCloud', 'youtube': 'YTMusic'}
+        platforms = {'spotify': 'Spotify', 'yandex': 'Yandex', 'soundcloud':'SoundCloud', 'youtubeMusic': 'YTMusic'}
         platforms_data = data['linksByPlatform']
 
         for platform, platform_name in platforms.items():
             if platform in platforms_data:
                 result['platform_urls'][platform_name] = platforms_data[platform]['url']
-
     return result

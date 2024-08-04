@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 import aiofiles
 from spotify import fetch_song_info
-import youtube_dl
+import yt_dlp as youtube_dl
 from config import COOKIE_FILE, CACHE_DIR, YOUTUBE_USERNAME, YOUTUBE_PASSWORD
 from aiogram import types
 from shared import bot
@@ -16,8 +16,8 @@ def download_audio(url: str):
     ydl_opts = {
         'cookiefile': COOKIE_FILE,
         
-        # 'username': YOUTUBE_USERNAME,
-        # 'password': YOUTUBE_PASSWORD,
+        # 'verbose': True,
+        'quiet': True,
         
         'outtmpl': f'{CACHE_DIR}/%(id)s.%(ext)s',
         'format': 'bestaudio',
