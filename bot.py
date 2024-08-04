@@ -3,6 +3,7 @@ import logging
 import re
 import sys
 from aiogram import Dispatcher, F, filters, types
+from aiogram.enums import ParseMode
 from aiogram.methods.delete_webhook import DeleteWebhook
 from config import URL_PATTERN
 from spotify import search_spotify, fetch_song_info
@@ -42,7 +43,7 @@ def init_bot():
             bot_info = await bot.get_me()
             result = types.InlineQueryResultArticle(
                 id="0",
-                title='Paste song url in message field...',
+                title='Paste song url or search query in the message field...',
                 input_message_content=types.InputTextMessageContent(message_text=f'@{bot_info.username} - share music via any links')
             )
             await inline_query.answer([result])

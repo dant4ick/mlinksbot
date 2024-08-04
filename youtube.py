@@ -4,7 +4,7 @@ import os
 import aiofiles
 from spotify import fetch_song_info
 import youtube_dl
-from config import COOKIE_FILE, CACHE_DIR
+from config import COOKIE_FILE, CACHE_DIR, YOUTUBE_USERNAME, YOUTUBE_PASSWORD
 from aiogram import types
 from shared import bot
 from utils import create_message_text
@@ -15,6 +15,10 @@ executor = ThreadPoolExecutor(max_workers=4)
 def download_audio(url: str):
     ydl_opts = {
         'cookiefile': COOKIE_FILE,
+        
+        # 'username': YOUTUBE_USERNAME,
+        # 'password': YOUTUBE_PASSWORD,
+        
         'outtmpl': f'{CACHE_DIR}/%(id)s.%(ext)s',
         'format': 'bestaudio',
         'postprocessors': [{

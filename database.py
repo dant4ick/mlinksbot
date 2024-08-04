@@ -1,13 +1,25 @@
+import logging
 import aiosqlite
 from config import DB_PATH
 
 async def init_db():
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute('''
-            CREATE TABLE IF NOT EXISTS downloads
-            (url TEXT PRIMARY KEY, file_id TEXT)
-        ''')
-        await db.commit()
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS downloads
+                (url TEXT PRIMARY KEY, file_id TEXT)
+            ''')
+            await db.commit()
+    except aiosqlite.OperationalError as e:
+        logging.error(f'Failed to create table (check if db file exists): {e}')
+        if not DB_PATH.exists():
+            logging.error('Database file does not exist, trying to create one...')
+            DB_PATH.touch()
+            await init_db()
+            return
+        else:
+            logging.error('Database file exists, but failed to create table')
+            
 
 async def get_file_id(url: str):
     async with aiosqlite.connect(DB_PATH) as db:

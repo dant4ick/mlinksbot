@@ -1,3 +1,4 @@
+import logging
 import time
 import aiohttp
 from urllib.parse import quote_plus
@@ -93,7 +94,7 @@ def process_song_info(data: dict):
             break
 
     if result and 'linksByPlatform' in data:
-        platforms = {'spotify': 'Spotify', 'yandex': 'Yandex', 'youtubeMusic': 'YTMusic'}
+        platforms = {'spotify': 'Spotify', 'yandex': 'Yandex', 'soundcloud':'SoundCloud', 'youtube': 'YTMusic'}
         platforms_data = data['linksByPlatform']
 
         for platform, platform_name in platforms.items():
