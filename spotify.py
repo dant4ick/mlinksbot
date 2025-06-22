@@ -96,7 +96,8 @@ def process_song_info(data: dict):
                 'platform_urls': {'All': data.get('pageUrl')},
                 'title': value.get('title'),
                 'artistName': value.get('artistName'),
-                'thumbnailUrl': value.get('thumbnailUrl')
+                'thumbnailUrl': value.get('thumbnailUrl'),
+                'type': value.get('type', 'song')  # Add type information
             }
             
             if "YOUTUBE" in key:
