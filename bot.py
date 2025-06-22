@@ -5,10 +5,11 @@ import sys
 from aiogram import Dispatcher, F, filters, types
 from aiogram.enums import ParseMode, ChatAction
 from aiogram.methods.delete_webhook import DeleteWebhook
-from config import URL_PATTERN
+from config import URL_PATTERN, ADMIN_USER_IDS
 from spotify import search_spotify, fetch_song_info
 from youtube import download_and_send_audio, download_and_send_audio_direct
 from utils import generate_inline_query_results, create_message_text
+from database import log_action, get_bot_statistics
 from shared import bot
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
@@ -19,6 +20,15 @@ def init_bot():
     @dp.inline_query(F.query.regexp(URL_PATTERN))
     async def search_song(inline_query: types.InlineQuery):
         query = inline_query.query
+        
+        # Log the inline query action
+        await log_action(
+            user_id=inline_query.from_user.id,
+            username=inline_query.from_user.username,
+            action_type="inline_query",
+            url=query
+        )
+        
         song_info = await fetch_song_info(query)
 
         if song_info:
@@ -49,6 +59,14 @@ def init_bot():
             await inline_query.answer([result])
             return
         
+        # Log the inline search query action
+        await log_action(
+            user_id=inline_query.from_user.id,
+            username=inline_query.from_user.username,
+            action_type="inline_query",
+            query=query_text
+        )
+        
         search_results = await search_spotify(query_text)
         results = []
         for song in search_results:
@@ -74,11 +92,116 @@ def init_bot():
             f"🚀 Try sending me a song now!"
         )
         await msg.answer(tutorial_message, parse_mode=ParseMode.MARKDOWN)
+        
+        # Log the start command usage
+        await log_action(
+            user_id=msg.from_user.id,
+            username=msg.from_user.username,
+            action_type="start_command"
+        )
+
+    @dp.message(filters.Command("stats"))
+    async def show_stats(msg: types.Message):
+        """Show bot usage statistics"""
+        # Check if user is admin
+        if not ADMIN_USER_IDS or msg.from_user.id not in ADMIN_USER_IDS:
+            await msg.answer("🚫 This command is only available for bot administrators.")
+            return
+        
+        await bot.send_chat_action(msg.chat.id, ChatAction.TYPING)
+        
+        try:
+            stats = await get_bot_statistics()
+            
+            # Format statistics message
+            stats_text = "📊 **Bot Usage Statistics**\n\n"
+            
+            # Basic stats
+            stats_text += f"👥 **Total Users:** {stats['total_users']}\n"
+            stats_text += f"🎯 **Total Actions:** {stats['total_actions']}\n"
+            stats_text += f"💾 **Total Downloads:** {stats['total_downloads']}\n\n"
+            
+            # Actions by type
+            if stats['actions_by_type']:
+                stats_text += "📈 **Actions by Type:**\n"
+                for action_type, count in stats['actions_by_type']:
+                    action_emoji = {
+                        'start_command': '🚀',
+                        'url_download': '🔗',
+                        'search_query': '🔍',
+                        'inline_query': '⚡'
+                    }.get(action_type, '📝')
+                    stats_text += f"{action_emoji} {action_type.replace('_', ' ').title()}: {count}\n"
+                stats_text += "\n"
+            
+            # Top users
+            if stats['top_users']:
+                stats_text += "🏆 **Top Active Users:**\n"
+                for i, (username, user_id, action_count) in enumerate(stats['top_users'][:5], 1):
+                    user_display = f"@{username}" if username else f"User {user_id}"
+                    stats_text += f"{i}. {user_display}: {action_count} actions\n"
+                stats_text += "\n"
+            
+            # Daily stats
+            if stats['daily_stats']:
+                stats_text += "📅 **Daily Activity (Last 7 Days):**\n"
+                for date, count in stats['daily_stats']:
+                    stats_text += f"📊 {date}: {count} actions\n"
+            
+            await msg.answer(stats_text, parse_mode=ParseMode.MARKDOWN)
+            
+            # Log the stats command usage
+            await log_action(
+                user_id=msg.from_user.id,
+                username=msg.from_user.username,
+                action_type="stats_command"
+            )
+            
+        except Exception as e:
+            logging.error(f"Error generating statistics: {e}")
+            await msg.answer("❌ Error generating statistics. Please try again later.")
+
+    @dp.message(filters.Command("help"))
+    async def show_help(msg: types.Message):
+        """Show available commands"""
+        help_text = (
+            "🤖 **Available Commands:**\n\n"
+            "🚀 `/start` - Get started with the bot\n"
+            "❓ `/help` - Show this help message\n"
+        )
+        
+        # Add stats command for admins
+        if ADMIN_USER_IDS and msg.from_user.id in ADMIN_USER_IDS:
+            help_text += "📊 `/stats` - View bot usage statistics (Admin only)\n"
+        
+        help_text += (
+            "\n🎵 **How to use:**\n"
+            "• Send a music URL (Spotify, YouTube, etc.)\n"
+            "• Search by typing song/artist name\n"
+            "• Use inline mode: type @botusername in any chat\n"
+        )
+        
+        await msg.answer(help_text, parse_mode=ParseMode.MARKDOWN)
+        
+        # Log the help command usage
+        await log_action(
+            user_id=msg.from_user.id,
+            username=msg.from_user.username,
+            action_type="help_command"
+        )
 
     @dp.message(F.text.regexp(URL_PATTERN))
     async def handle_music_url(msg: types.Message):
         """Handle messages containing music URLs"""
         url = msg.text.strip()
+        
+        # Log the URL download action
+        await log_action(
+            user_id=msg.from_user.id,
+            username=msg.from_user.username,
+            action_type="url_download",
+            url=url
+        )
         
         # Send typing action while fetching song info
         await bot.send_chat_action(msg.chat.id, ChatAction.TYPING)
@@ -145,6 +268,14 @@ def init_bot():
         if len(query) < 2:
             await msg.answer("🔍 Please provide a longer search query (at least 2 characters).")
             return
+        
+        # Log the search query action
+        await log_action(
+            user_id=msg.from_user.id,
+            username=msg.from_user.username,
+            action_type="search_query",
+            query=query
+        )
         
         # Send typing action while searching
         await bot.send_chat_action(msg.chat.id, ChatAction.TYPING)

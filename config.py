@@ -8,6 +8,8 @@ CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET")
 YOUTUBE_USERNAME = os.environ.get("YOUTUBE_USERNAME")
 YOUTUBE_PASSWORD = os.environ.get("YOUTUBE_PASSWORD")
 
+ADMIN_USER_IDS = [int(uid.strip()) for uid in os.environ.get("ADMIN_USER_IDS", "").split(",") if uid.strip()]
+
 URL_PATTERN = r'[(http(s)?):\/\/(www\.)?a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)'
 
 BASE_DIR = Path(__file__).resolve().parent
