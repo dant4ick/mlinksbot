@@ -15,7 +15,20 @@ executor = ThreadPoolExecutor(max_workers=4)
 # Proxy configuration for yt-dlp
 PROXY_URL = "socks5://127.0.0.1:1080"
 
-def download_audio(url: str):
+def download_audio(url: str, song_info: dict = None):
+    # Create a safe filename from song info if available
+    if song_info and song_info.get('title') and song_info.get('artistName'):
+        # Clean filename by removing invalid characters
+        title = "".join(c for c in song_info['title'] if c.isalnum() or c in (' ', '-', '_')).strip()
+        artist = "".join(c for c in song_info['artistName'] if c.isalnum() or c in (' ', '-', '_')).strip()
+        safe_filename = f"{artist} - {title}"
+        # Limit filename length to avoid filesystem issues
+        if len(safe_filename) > 100:
+            safe_filename = safe_filename[:100]
+        outtmpl = f'{CACHE_DIR}/{safe_filename}.%(ext)s'
+    else:
+        outtmpl = f'{CACHE_DIR}/%(id)s.%(ext)s'
+    
     ydl_opts = {
         'cookiefile': COOKIE_FILE,
         'proxy': PROXY_URL,
@@ -23,11 +36,11 @@ def download_audio(url: str):
         # 'verbose': True,
         'quiet': True,
         
-        'outtmpl': f'{CACHE_DIR}/%(id)s.%(ext)s',
+        'outtmpl': outtmpl,
         'format': 'bestaudio',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
+            'preferredcodec': 'aac',
         }],
     }
 
@@ -41,7 +54,8 @@ def download_audio(url: str):
         ydl.download([url])
 
         temp_filename = ydl.prepare_filename(info_dict)
-        filename = f"{os.path.splitext(temp_filename)[0]}.mp3"
+        # Use .m4a extension for aac codec
+        filename = f"{os.path.splitext(temp_filename)[0]}.m4a"
 
         return (
             filename,
@@ -56,8 +70,11 @@ async def download_and_send_audio(res: types.ChosenInlineResult):
     file_id = await get_file_id(url)
 
     if not file_id:
+        # Fetch song info first to get proper naming
+        song_info = await fetch_song_info(url)
+        
         try:
-            audio_file = await asyncio.get_event_loop().run_in_executor(executor, lambda: download_audio(url))
+            audio_file = await asyncio.get_event_loop().run_in_executor(executor, lambda: download_audio(url, song_info))
         except Exception as e:
             await report_download_failure(res, str(e))
             return
@@ -97,8 +114,11 @@ async def download_and_send_audio_direct(chat_id: int, message_id: int, url: str
     file_id = await get_file_id(url)
 
     if not file_id:
+        # Fetch song info first to get proper naming
+        song_info = await fetch_song_info(url)
+        
         try:
-            audio_file = await asyncio.get_event_loop().run_in_executor(executor, lambda: download_audio(url))
+            audio_file = await asyncio.get_event_loop().run_in_executor(executor, lambda: download_audio(url, song_info))
         except Exception as e:
             await report_download_failure_direct(chat_id, message_id, str(e))
             return
