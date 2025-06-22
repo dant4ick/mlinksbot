@@ -7,8 +7,8 @@ from aiogram.enums import ParseMode
 from aiogram.methods.delete_webhook import DeleteWebhook
 from config import URL_PATTERN
 from spotify import search_spotify, fetch_song_info
-from youtube import download_and_send_audio
-from utils import generate_inline_query_results
+from youtube import download_and_send_audio, download_and_send_audio_direct
+from utils import generate_inline_query_results, create_message_text
 from shared import bot
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
@@ -62,17 +62,129 @@ def init_bot():
     async def start(msg: types.Message):
         bot_info = await bot.get_me()
         tutorial_message = (
-            f"👋 Hello! Here's how to use me in inline query mode:\n"
-            f"1️⃣ Type the bot's username in any chat, followed by a space.\n"
-            f"2️⃣ Paste the URL of the song you want to share. For example: `@{bot_info.username} https://www.youtube.com/watch?v=P_bPsPp_f1k`\n"
-            f"3️⃣ You'll see a preview of the song information. Tap on it to send it to your chat.\n\n"
-            f"🚀 Try it out now!"
+            f"👋 Hello! Here's how to use me:\n\n"
+            f"🔗 **Send a music link directly:**\n"
+            f"Just paste any music URL (Spotify, YouTube, etc.) and I'll download it for you!\n\n"
+            f"🔍 **Search for music:**\n"
+            f"Type the name of a song or artist and I'll find it for you!\n\n"
+            f"⚡ **Use inline mode:**\n"
+            f"1️⃣ Type `@{bot_info.username}` in any chat, followed by a space.\n"
+            f"2️⃣ Paste the URL or search query.\n"
+            f"3️⃣ Choose from the results to share with others.\n\n"
+            f"🚀 Try sending me a song now!"
         )
         await msg.answer(tutorial_message, parse_mode=ParseMode.MARKDOWN)
+
+    @dp.message(F.text.regexp(URL_PATTERN))
+    async def handle_music_url(msg: types.Message):
+        """Handle messages containing music URLs"""
+        url = msg.text.strip()
+        
+        # Try to fetch song info from the URL
+        song_info = await fetch_song_info(url)
+        
+        if song_info:
+            # Create a message with song info
+            message_text = await create_message_text(song_info)
+            
+            # Send song info first
+            info_msg = await msg.answer(
+                message_text,
+                link_preview_options=types.LinkPreviewOptions(
+                    url=song_info['thumbnailUrl'], 
+                    prefer_large_media=True, 
+                    show_above_text=True
+                ),
+                reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[
+                    [types.InlineKeyboardButton(text="⏳ Downloading...", callback_data="downloading")]
+                ])
+            )
+            
+            # Start downloading in background
+            yt_url = song_info['platform_urls'].get('YTMusic')
+            if yt_url:
+                await asyncio.create_task(download_and_send_audio_direct(
+                    msg.chat.id, 
+                    info_msg.message_id, 
+                    yt_url, 
+                    msg.from_user.id
+                ))
+            else:
+                # Update button if no downloadable URL found
+                await info_msg.edit_reply_markup(
+                    reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[
+                        [types.InlineKeyboardButton(text="❌ No downloadable source found", callback_data="download_error")]
+                    ])
+                )
+        else:
+            await msg.answer("❌ Couldn't find information about this music link. Please try another URL.")
+
+    @dp.message(F.text & ~F.text.regexp(URL_PATTERN) & ~F.text.startswith('/'))
+    async def handle_music_search(msg: types.Message):
+        """Handle messages containing search queries"""
+        query = msg.text.strip()
+        
+        if len(query) < 2:
+            await msg.answer("🔍 Please provide a longer search query (at least 2 characters).")
+            return
+        
+        # Search on Spotify
+        search_results = await search_spotify(query)
+        
+        if search_results:
+            # Take the first result (most relevant)
+            first_result = search_results[0]
+            song_info = await fetch_song_info(first_result['url'])
+            
+            if song_info:
+                # Create a message with song info
+                message_text = await create_message_text(song_info)
+                
+                # Send song info first
+                info_msg = await msg.answer(
+                    message_text,
+                    link_preview_options=types.LinkPreviewOptions(
+                        url=song_info['thumbnailUrl'], 
+                        prefer_large_media=True, 
+                        show_above_text=True
+                    ),
+                    reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[
+                        [types.InlineKeyboardButton(text="⏳ Downloading...", callback_data="downloading")]
+                    ])
+                )
+                
+                # Start downloading in background
+                yt_url = song_info['platform_urls'].get('YTMusic')
+                if yt_url:
+                    await asyncio.create_task(download_and_send_audio_direct(
+                        msg.chat.id, 
+                        info_msg.message_id, 
+                        yt_url, 
+                        msg.from_user.id
+                    ))
+                else:
+                    # Update button if no downloadable URL found
+                    await info_msg.edit_reply_markup(
+                        reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[
+                            [types.InlineKeyboardButton(text="❌ No downloadable source found", callback_data="download_error")]
+                        ])
+                    )
+            else:
+                await msg.answer("❌ Couldn't fetch detailed information about the found song.")
+        else:
+            await msg.answer(f"🔍 No results found for: '{query}'\n\nTry using different keywords or check the spelling.")
 
     @dp.callback_query(F.data == "download_error")
     async def handle_download_error(call: types.CallbackQuery):
         await call.answer("There was an error downloading the track. It might be too long or unavailable.", show_alert=True)
+
+    @dp.callback_query(F.data == "download_success")
+    async def handle_download_success(call: types.CallbackQuery):
+        await call.answer("Track downloaded successfully! 🎵", show_alert=False)
+
+    @dp.callback_query(F.data == "downloading")
+    async def handle_downloading(call: types.CallbackQuery):
+        await call.answer("Downloading in progress, please wait... ⏳", show_alert=False)
 
     @dp.callback_query()
     async def downloading_info(call: types.CallbackQuery):

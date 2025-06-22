@@ -4,7 +4,7 @@ import os
 import aiofiles
 from spotify import fetch_song_info
 import yt_dlp as youtube_dl
-from config import COOKIE_FILE, CACHE_DIR, YOUTUBE_USERNAME, YOUTUBE_PASSWORD
+from config import COOKIE_FILE, CACHE_DIR
 from aiogram import types
 from shared import bot
 from utils import create_message_text
@@ -91,3 +91,82 @@ async def report_download_failure(res, e: str = None):
             [types.InlineKeyboardButton(text="Error", callback_data="download_error")]
         ])
     )
+
+async def download_and_send_audio_direct(chat_id: int, message_id: int, url: str, user_id: int):
+    """Download and send audio directly to a chat (for regular messages)"""
+    file_id = await get_file_id(url)
+
+    if not file_id:
+        try:
+            audio_file = await asyncio.get_event_loop().run_in_executor(executor, lambda: download_audio(url))
+        except Exception as e:
+            await report_download_failure_direct(chat_id, message_id, str(e))
+            return
+
+        if not audio_file:
+            await report_download_failure_direct(chat_id, message_id)
+            return
+        elif audio_file == 'Track is too long':
+            await report_download_failure_direct(chat_id, message_id, 'Track is too long (max 10 minutes)')
+            return
+
+        filename, duration, performer, title, thumbnail = audio_file
+        try:
+            async with aiofiles.open(filename, 'rb') as f:
+                input_file = types.FSInputFile(f.name)
+                file_msg = await bot.send_audio(
+                    chat_id, 
+                    input_file, 
+                    duration=duration, 
+                    performer=performer, 
+                    title=title, 
+                    thumbnail=types.URLInputFile(thumbnail)
+                )
+            file_id = file_msg.audio.file_id
+            await save_file_id(url, file_id)
+            os.remove(filename)
+            
+            # Update the original message to show success
+            await bot.edit_message_reply_markup(
+                chat_id=chat_id,
+                message_id=message_id,
+                reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[
+                    [types.InlineKeyboardButton(text="✅ Downloaded successfully!", callback_data="download_success")]
+                ])
+            )
+        except Exception as e:
+            await report_download_failure_direct(chat_id, message_id, str(e))
+            if os.path.exists(filename):
+                os.remove(filename)
+            return
+    else:
+        # File already exists in cache, send it directly
+        try:
+            song_info = await fetch_song_info(url)
+            caption = await create_message_text(song_info)
+            await bot.send_audio(chat_id, file_id, caption=caption)
+            
+            # Update the original message to show success
+            await bot.edit_message_reply_markup(
+                chat_id=chat_id,
+                message_id=message_id,
+                reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[
+                    [types.InlineKeyboardButton(text="✅ Downloaded successfully!", callback_data="download_success")]
+                ])
+            )
+        except Exception as e:
+            await report_download_failure_direct(chat_id, message_id, str(e))
+
+async def report_download_failure_direct(chat_id: int, message_id: int, error_msg: str = None):
+    """Report download failure for direct messages"""
+    try:
+        await bot.send_message(chat_id, f"❌ Failed to download the track.\n\n<code>{error_msg or 'Unknown error occurred'}</code>")
+        await bot.edit_message_reply_markup(
+            chat_id=chat_id,
+            message_id=message_id,
+            reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[
+                [types.InlineKeyboardButton(text="❌ Download failed", callback_data="download_error")]
+            ])
+        )
+    except Exception as e:
+        print(f"Error reporting download failure: {e}")
