@@ -12,9 +12,13 @@ from database import get_file_id, save_file_id
 
 executor = ThreadPoolExecutor(max_workers=4)
 
+# Proxy configuration for yt-dlp
+PROXY_URL = "socks5://127.0.0.1:1080"
+
 def download_audio(url: str):
     ydl_opts = {
         'cookiefile': COOKIE_FILE,
+        'proxy': PROXY_URL,
         
         # 'verbose': True,
         'quiet': True,

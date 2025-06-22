@@ -1,9 +1,12 @@
 import logging
 import time
 import aiohttp
-import socket
 from urllib.parse import quote_plus
+from aiohttp_socks import ProxyConnector
 from config import CLIENT_ID, CLIENT_SECRET
+
+# Proxy configuration
+PROXY_URL = "socks5://127.0.0.1:1080"
 
 class SpotifyTokenManager:
     def __init__(self, client_id: str, client_secret: str):
@@ -26,7 +29,7 @@ class SpotifyTokenManager:
         }
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         
-        connector = aiohttp.TCPConnector(family=socket.AF_INET)
+        connector = ProxyConnector.from_url(PROXY_URL)
         async with aiohttp.ClientSession(connector=connector) as session:
             async with session.post(url, data=data, headers=headers) as response:
                 response_data = await response.json()
@@ -53,7 +56,7 @@ async def search_spotify(query, types='track', market=None, limit=1, offset=0, i
     
     headers = {'Authorization': f'Bearer {SPOTIFY_TOKEN}'}
     
-    connector = aiohttp.TCPConnector(family=socket.AF_INET)
+    connector = ProxyConnector.from_url(PROXY_URL)
     async with aiohttp.ClientSession(connector=connector) as session:
         async with session.get(url, headers=headers) as response:
             if response.status == 200:
@@ -76,7 +79,7 @@ async def search_spotify(query, types='track', market=None, limit=1, offset=0, i
 async def fetch_song_info(url: str):
     api_url = f"https://api.song.link/v1-alpha.1/links?url={url}"
 
-    connector = aiohttp.TCPConnector(family=socket.AF_INET)
+    connector = ProxyConnector.from_url(PROXY_URL)
     async with aiohttp.ClientSession(connector=connector) as session:
         async with session.get(api_url) as response:
             if response.status == 200:

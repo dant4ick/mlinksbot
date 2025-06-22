@@ -7,5 +7,6 @@ cache/
 
 *.sh
 *.db
+*.json
 
 youtube_cookies.txt
