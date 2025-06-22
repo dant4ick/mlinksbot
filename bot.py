@@ -3,7 +3,7 @@ import logging
 import re
 import sys
 from aiogram import Dispatcher, F, filters, types
-from aiogram.enums import ParseMode
+from aiogram.enums import ParseMode, ChatAction
 from aiogram.methods.delete_webhook import DeleteWebhook
 from config import URL_PATTERN
 from spotify import search_spotify, fetch_song_info
@@ -80,6 +80,9 @@ def init_bot():
         """Handle messages containing music URLs"""
         url = msg.text.strip()
         
+        # Send typing action while fetching song info
+        await bot.send_chat_action(msg.chat.id, ChatAction.TYPING)
+        
         # Try to fetch song info from the URL
         song_info = await fetch_song_info(url)
         
@@ -112,6 +115,9 @@ def init_bot():
                     ])
                 )
                 
+                # Send upload_audio action while downloading
+                await bot.send_chat_action(msg.chat.id, ChatAction.UPLOAD_VOICE)
+                
                 # Start downloading in background
                 yt_url = song_info['platform_urls'].get('YTMusic')
                 if yt_url:
@@ -139,6 +145,9 @@ def init_bot():
         if len(query) < 2:
             await msg.answer("🔍 Please provide a longer search query (at least 2 characters).")
             return
+        
+        # Send typing action while searching
+        await bot.send_chat_action(msg.chat.id, ChatAction.TYPING)
         
         # Search on Spotify
         search_results = await search_spotify(query)
@@ -176,6 +185,9 @@ def init_bot():
                             [types.InlineKeyboardButton(text="⏳ Downloading...", callback_data="downloading")]
                         ])
                     )
+                    
+                    # Send upload_audio action while downloading
+                    await bot.send_chat_action(msg.chat.id, ChatAction.UPLOAD_VOICE)
                     
                     # Start downloading in background
                     yt_url = song_info['platform_urls'].get('YTMusic')
