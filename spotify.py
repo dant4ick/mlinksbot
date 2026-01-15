@@ -4,9 +4,10 @@ import aiohttp
 from urllib.parse import quote_plus
 from aiohttp_socks import ProxyConnector
 from config import CLIENT_ID, CLIENT_SECRET
+import os
 
-# Proxy configuration
-PROXY_URL = "socks5://127.0.0.1:1080"
+# Proxy configuration (connects to shadowsocks container)
+PROXY_URL = os.environ.get("PROXY_URL", "socks5://shadowsocks:1080")
 
 class SpotifyTokenManager:
     def __init__(self, client_id: str, client_secret: str):

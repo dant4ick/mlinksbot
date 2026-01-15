@@ -5,8 +5,10 @@
 __pycache__/
 cache/
 
-*.sh
+start.sh
 *.db
 *.json
+
+.env
 
 youtube_cookies.txt

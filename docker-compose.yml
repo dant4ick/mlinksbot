@@ -1,0 +1,35 @@
+services:
+  shadowsocks:
+    image: ghcr.io/shadowsocks/sslocal-rust:latest
+    container_name: mlinksbot-ss
+    restart: unless-stopped
+    command: >
+      sslocal
+      --server-url ${SS_SERVER_URL}
+      --local-addr 0.0.0.0:1080
+      --protocol socks
+    networks:
+      - vpn
+
+  bot:
+    build: .
+    container_name: mlinksbot
+    restart: unless-stopped
+    depends_on:
+      - shadowsocks
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
+      - YOUTUBE_USERNAME=${YOUTUBE_USERNAME}
+      - YOUTUBE_PASSWORD=${YOUTUBE_PASSWORD}
+      - ADMIN_USER_IDS=${ADMIN_USER_IDS}
+      - LOADING_AUDIO_ID=${LOADING_AUDIO_ID}
+    volumes:
+      - ./downloads:/app/downloads
+    networks:
+      - vpn
+
+networks:
+  vpn:
+    driver: bridge

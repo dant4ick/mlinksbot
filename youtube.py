@@ -12,8 +12,8 @@ from database import get_file_id, save_file_id
 
 executor = ThreadPoolExecutor(max_workers=4)
 
-# Proxy configuration for yt-dlp
-PROXY_URL = "socks5://127.0.0.1:1080"
+# Proxy configuration for yt-dlp (connects to shadowsocks container)
+PROXY_URL = os.environ.get("PROXY_URL", "socks5://shadowsocks:1080")
 
 def download_audio(url: str, song_info: dict = None):
     # Create a safe filename from song info if available
