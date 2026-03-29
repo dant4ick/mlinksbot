@@ -207,8 +207,12 @@ def init_bot():
         await bot.send_chat_action(msg.chat.id, ChatAction.TYPING)
         
         # Try to fetch song info from the URL
-        song_info = await fetch_song_info(url)
-        
+        try:
+            song_info = await fetch_song_info(url)
+        except Exception as e:
+            await msg.answer(f"❌ Couldn't find information about this music link.\n\n<code>{e}</code>")
+            return
+
         if song_info:
             # Create a message with song info
             message_text = await create_message_text(song_info)

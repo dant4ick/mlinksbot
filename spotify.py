@@ -86,6 +86,9 @@ async def fetch_song_info(url: str):
             if response.status == 200:
                 data = await response.json()
                 return process_song_info(data)
+            else:
+                error_text = await response.text()
+                raise RuntimeError(f"song.link API returned {response.status}: {error_text[:200]}")
 
 def process_song_info(data: dict):
     song_data = data.get('entitiesByUniqueId', {})
